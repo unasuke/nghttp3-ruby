@@ -252,5 +252,6 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   /* Initialize other classes */
   Init_nghttp3_settings();
   Init_nghttp3_nv();
+  Init_nghttp3_callbacks();
   Init_nghttp3_connection();
 }

@@ -4,7 +4,8 @@ VALUE rb_cNghttp3Connection;
 
 typedef struct {
   nghttp3_conn *conn;
-  VALUE settings; /* Prevent Settings from being GC'd */
+  VALUE settings;  /* Prevent Settings from being GC'd */
+  VALUE callbacks; /* Prevent Callbacks from being GC'd */
   int is_closed;
   int is_server;
 } ConnectionObj;
@@ -13,6 +14,9 @@ static void connection_mark(void *ptr) {
   ConnectionObj *obj = (ConnectionObj *)ptr;
   if (obj->settings != Qnil) {
     rb_gc_mark(obj->settings);
+  }
+  if (obj->callbacks != Qnil) {
+    rb_gc_mark(obj->callbacks);
   }
 }
 
@@ -46,6 +50,7 @@ static VALUE connection_alloc(VALUE klass) {
       TypedData_Make_Struct(klass, ConnectionObj, &connection_data_type, obj);
   obj->conn = NULL;
   obj->settings = Qnil;
+  obj->callbacks = Qnil;
   obj->is_closed = 0;
   obj->is_server = 0;
   return self;
@@ -67,15 +72,26 @@ nghttp3_conn *nghttp3_rb_get_conn(VALUE rb_conn) {
 }
 
 /*
+ * Returns the callbacks object associated with the connection.
+ * For internal use by callback wrapper functions.
+ */
+VALUE nghttp3_rb_get_callbacks(VALUE rb_conn) {
+  ConnectionObj *obj;
+  TypedData_Get_Struct(rb_conn, ConnectionObj, &connection_data_type, obj);
+  return obj->callbacks;
+}
+
+/*
  * call-seq:
- *   Connection.client_new(settings = nil) -> Connection
+ *   Connection.client_new(settings = nil, callbacks = nil) -> Connection
  *
  * Creates a new client HTTP/3 connection.
  * If settings is nil, default settings are used.
+ * If callbacks is provided, it will be used for HTTP/3 event notifications.
  */
 static VALUE rb_nghttp3_connection_client_new(int argc, VALUE *argv,
                                               VALUE klass) {
-  VALUE rb_settings;
+  VALUE rb_settings, rb_callbacks;
   ConnectionObj *obj;
   nghttp3_settings settings;
   nghttp3_settings *settings_ptr;
@@ -83,7 +99,7 @@ static VALUE rb_nghttp3_connection_client_new(int argc, VALUE *argv,
   int rv;
   VALUE self;
 
-  rb_scan_args(argc, argv, "01", &rb_settings);
+  rb_scan_args(argc, argv, "02", &rb_settings, &rb_callbacks);
 
   self = connection_alloc(klass);
   TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
@@ -96,9 +112,14 @@ static VALUE rb_nghttp3_connection_client_new(int argc, VALUE *argv,
     obj->settings = rb_settings;
   }
 
-  /* Initialize callbacks with all NULLs for now (Phase 4).
-   * Phase 5 will add proper Callbacks class support. */
+  /* Initialize callbacks structure */
   memset(&callbacks, 0, sizeof(callbacks));
+
+  if (!NIL_P(rb_callbacks)) {
+    obj->callbacks = rb_callbacks;
+    nghttp3_rb_setup_callbacks(&callbacks);
+  }
+
   rv = nghttp3_conn_client_new(&obj->conn, &callbacks, settings_ptr, NULL,
                                (void *)self);
 
@@ -112,14 +133,15 @@ static VALUE rb_nghttp3_connection_client_new(int argc, VALUE *argv,
 
 /*
  * call-seq:
- *   Connection.server_new(settings = nil) -> Connection
+ *   Connection.server_new(settings = nil, callbacks = nil) -> Connection
  *
  * Creates a new server HTTP/3 connection.
  * If settings is nil, default settings are used.
+ * If callbacks is provided, it will be used for HTTP/3 event notifications.
  */
 static VALUE rb_nghttp3_connection_server_new(int argc, VALUE *argv,
                                               VALUE klass) {
-  VALUE rb_settings;
+  VALUE rb_settings, rb_callbacks;
   ConnectionObj *obj;
   nghttp3_settings settings;
   nghttp3_settings *settings_ptr;
@@ -127,7 +149,7 @@ static VALUE rb_nghttp3_connection_server_new(int argc, VALUE *argv,
   int rv;
   VALUE self;
 
-  rb_scan_args(argc, argv, "01", &rb_settings);
+  rb_scan_args(argc, argv, "02", &rb_settings, &rb_callbacks);
 
   self = connection_alloc(klass);
   TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
@@ -140,9 +162,14 @@ static VALUE rb_nghttp3_connection_server_new(int argc, VALUE *argv,
     obj->settings = rb_settings;
   }
 
-  /* Initialize callbacks with all NULLs for now (Phase 4).
-   * Phase 5 will add proper Callbacks class support. */
+  /* Initialize callbacks structure */
   memset(&callbacks, 0, sizeof(callbacks));
+
+  if (!NIL_P(rb_callbacks)) {
+    obj->callbacks = rb_callbacks;
+    nghttp3_rb_setup_callbacks(&callbacks);
+  }
+
   rv = nghttp3_conn_server_new(&obj->conn, &callbacks, settings_ptr, NULL,
                                (void *)self);
 
