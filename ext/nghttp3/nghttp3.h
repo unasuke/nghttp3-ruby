@@ -27,6 +27,10 @@ extern VALUE rb_eNghttp3CallbackFailureError;
 /* Data structure classes */
 extern VALUE rb_cNghttp3Settings;
 extern VALUE rb_cNghttp3NV;
+extern VALUE rb_cNghttp3Connection;
+
+/* TypedData type for Settings (used by Connection) */
+extern const rb_data_type_t settings_data_type;
 
 /* Helper functions */
 VALUE nghttp3_rb_error_class_for_code(int error_code);
@@ -37,5 +41,11 @@ nghttp3_settings *nghttp3_rb_get_settings(VALUE rb_settings);
 
 /* NV helper */
 nghttp3_nv nghttp3_rb_nv_to_c(VALUE rb_nv);
+
+/* Connection helper */
+nghttp3_conn *nghttp3_rb_get_conn(VALUE rb_conn);
+
+/* Connection init function */
+void Init_nghttp3_connection(void);
 
 #endif /* NGHTTP3_RUBY_H */

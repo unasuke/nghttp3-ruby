@@ -171,7 +171,7 @@ static void settings_free(void *ptr) { xfree(ptr); }
 
 static size_t settings_memsize(const void *ptr) { return sizeof(SettingsObj); }
 
-static const rb_data_type_t settings_data_type = {
+const rb_data_type_t settings_data_type = {
     .wrap_struct_name = "nghttp3_settings_rb",
     .function =
         {
@@ -524,4 +524,7 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   rb_define_method(rb_cNghttp3NV, "name", rb_nghttp3_nv_get_name, 0);
   rb_define_method(rb_cNghttp3NV, "value", rb_nghttp3_nv_get_value, 0);
   rb_define_method(rb_cNghttp3NV, "flags", rb_nghttp3_nv_get_flags, 0);
+
+  /* Initialize Connection class */
+  Init_nghttp3_connection();
 }

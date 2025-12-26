@@ -120,4 +120,30 @@ module Nghttp3
     def value: () -> String
     def flags: () -> Integer
   end
+
+  class Connection
+    # Creates a new client connection
+    def self.client_new: (?Settings? settings) -> Connection
+
+    # Creates a new server connection
+    def self.server_new: (?Settings? settings) -> Connection
+
+    # Binds the control stream
+    def bind_control_stream: (Integer stream_id) -> self
+
+    # Binds QPACK encoder and decoder streams
+    def bind_qpack_streams: (Integer encoder_stream_id, Integer decoder_stream_id) -> self
+
+    # Closes the connection
+    def close: () -> nil
+
+    # Returns true if the connection is closed
+    def closed?: () -> bool
+
+    # Returns true if this is a server connection
+    def server?: () -> bool
+
+    # Returns true if this is a client connection
+    def client?: () -> bool
+  end
 end
