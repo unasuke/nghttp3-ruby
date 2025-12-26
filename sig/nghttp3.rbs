@@ -1,4 +1,20 @@
 module Nghttp3
   VERSION: String
-  # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+
+  # nghttp3 library compile-time constants
+  NGHTTP3_VERSION: String
+  NGHTTP3_VERSION_NUM: Integer
+  NGHTTP3_VERSION_AGE: Integer
+
+  # Returns runtime version info, or nil if least_version requirement not met
+  def self.library_version: (?Integer least_version) -> Info?
+
+  class Info
+    def age: () -> Integer
+    def version_num: () -> Integer
+    def version_str: () -> String
+  end
+
+  class Error < StandardError
+  end
 end
