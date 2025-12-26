@@ -23,5 +23,37 @@ module Nghttp3
 
     # Returns true if this is a client connection
     def client?: () -> bool
+
+    # Stream operations
+
+    # Reads data on a stream from the QUIC layer
+    def read_stream: (Integer stream_id, String data, ?fin: bool) -> Integer
+
+    # Gets stream data to send to the QUIC layer
+    def writev_stream: () -> { stream_id: Integer, fin: bool, data: String }?
+
+    # Tells the connection that n bytes have been accepted by the QUIC layer
+    def add_write_offset: (Integer stream_id, Integer n) -> self
+
+    # Tells the connection that n bytes have been acknowledged by the remote peer
+    def add_ack_offset: (Integer stream_id, Integer n) -> self
+
+    # Marks a stream as blocked due to QUIC flow control
+    def block_stream: (Integer stream_id) -> self
+
+    # Marks a stream as unblocked
+    def unblock_stream: (Integer stream_id) -> self
+
+    # Returns true if the stream is writable
+    def stream_writable?: (Integer stream_id) -> bool
+
+    # Closes the stream with the given error code
+    def close_stream: (Integer stream_id, Integer app_error_code) -> self
+
+    # Prevents any further write operations on the stream
+    def shutdown_stream_write: (Integer stream_id) -> self
+
+    # Resumes a stream that was blocked for input data
+    def resume_stream: (Integer stream_id) -> self
   end
 end

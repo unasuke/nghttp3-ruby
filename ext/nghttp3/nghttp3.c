@@ -214,6 +214,40 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   rb_define_const(rb_mNghttp3, "NGHTTP3_ERR_CALLBACK_FAILURE",
                   INT2NUM(NGHTTP3_ERR_CALLBACK_FAILURE));
 
+  /* Define HTTP/3 application error code constants */
+  rb_define_const(rb_mNghttp3, "H3_NO_ERROR", INT2NUM(NGHTTP3_H3_NO_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_GENERAL_PROTOCOL_ERROR",
+                  INT2NUM(NGHTTP3_H3_GENERAL_PROTOCOL_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_INTERNAL_ERROR",
+                  INT2NUM(NGHTTP3_H3_INTERNAL_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_STREAM_CREATION_ERROR",
+                  INT2NUM(NGHTTP3_H3_STREAM_CREATION_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_CLOSED_CRITICAL_STREAM",
+                  INT2NUM(NGHTTP3_H3_CLOSED_CRITICAL_STREAM));
+  rb_define_const(rb_mNghttp3, "H3_FRAME_UNEXPECTED",
+                  INT2NUM(NGHTTP3_H3_FRAME_UNEXPECTED));
+  rb_define_const(rb_mNghttp3, "H3_FRAME_ERROR",
+                  INT2NUM(NGHTTP3_H3_FRAME_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_EXCESSIVE_LOAD",
+                  INT2NUM(NGHTTP3_H3_EXCESSIVE_LOAD));
+  rb_define_const(rb_mNghttp3, "H3_ID_ERROR", INT2NUM(NGHTTP3_H3_ID_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_SETTINGS_ERROR",
+                  INT2NUM(NGHTTP3_H3_SETTINGS_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_MISSING_SETTINGS",
+                  INT2NUM(NGHTTP3_H3_MISSING_SETTINGS));
+  rb_define_const(rb_mNghttp3, "H3_REQUEST_REJECTED",
+                  INT2NUM(NGHTTP3_H3_REQUEST_REJECTED));
+  rb_define_const(rb_mNghttp3, "H3_REQUEST_CANCELLED",
+                  INT2NUM(NGHTTP3_H3_REQUEST_CANCELLED));
+  rb_define_const(rb_mNghttp3, "H3_REQUEST_INCOMPLETE",
+                  INT2NUM(NGHTTP3_H3_REQUEST_INCOMPLETE));
+  rb_define_const(rb_mNghttp3, "H3_MESSAGE_ERROR",
+                  INT2NUM(NGHTTP3_H3_MESSAGE_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_CONNECT_ERROR",
+                  INT2NUM(NGHTTP3_H3_CONNECT_ERROR));
+  rb_define_const(rb_mNghttp3, "H3_VERSION_FALLBACK",
+                  INT2NUM(NGHTTP3_H3_VERSION_FALLBACK));
+
   /* Define specific error classes */
   rb_eNghttp3InvalidArgumentError = rb_define_class_under(
       rb_mNghttp3, "InvalidArgumentError", rb_eNghttp3Error);

@@ -29,6 +29,25 @@ module Nghttp3
   NV_FLAG_NO_COPY_VALUE: Integer
   NV_FLAG_TRY_INDEX: Integer
 
+  # HTTP/3 application error code constants
+  H3_NO_ERROR: Integer
+  H3_GENERAL_PROTOCOL_ERROR: Integer
+  H3_INTERNAL_ERROR: Integer
+  H3_STREAM_CREATION_ERROR: Integer
+  H3_CLOSED_CRITICAL_STREAM: Integer
+  H3_FRAME_UNEXPECTED: Integer
+  H3_FRAME_ERROR: Integer
+  H3_EXCESSIVE_LOAD: Integer
+  H3_ID_ERROR: Integer
+  H3_SETTINGS_ERROR: Integer
+  H3_MISSING_SETTINGS: Integer
+  H3_REQUEST_REJECTED: Integer
+  H3_REQUEST_CANCELLED: Integer
+  H3_REQUEST_INCOMPLETE: Integer
+  H3_MESSAGE_ERROR: Integer
+  H3_CONNECT_ERROR: Integer
+  H3_VERSION_FALLBACK: Integer
+
   # Returns runtime version info, or nil if least_version requirement not met
   def self.library_version: (?Integer least_version) -> Info?
 

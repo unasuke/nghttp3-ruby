@@ -103,4 +103,161 @@ class TestNghttp3Connection < Minitest::Test
   ensure
     conn&.close
   end
+
+  # Stream operation tests
+
+  def test_writev_stream_returns_hash_with_data
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+    # After binding streams, there's initial settings data to send
+    result = conn.writev_stream
+    assert_kind_of Hash, result
+    assert_includes result.keys, :stream_id
+    assert_includes result.keys, :fin
+    assert_includes result.keys, :data
+    assert_kind_of Integer, result[:stream_id]
+    assert_includes [true, false], result[:fin]
+    assert_kind_of String, result[:data]
+  ensure
+    conn&.close
+  end
+
+  def test_writev_stream_returns_nil_when_exhausted
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+    # Drain all pending data
+    while (result = conn.writev_stream)
+      conn.add_write_offset(result[:stream_id], result[:data].bytesize)
+    end
+    # Now should return nil
+    assert_nil conn.writev_stream
+  ensure
+    conn&.close
+  end
+
+  def test_writev_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.writev_stream
+    end
+  end
+
+  def test_read_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.read_stream(0, "test")
+    end
+  end
+
+  def test_add_write_offset_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.add_write_offset(0, 10)
+    end
+  end
+
+  def test_add_ack_offset_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.add_ack_offset(0, 10)
+    end
+  end
+
+  def test_block_stream_returns_self
+    conn = Nghttp3::Connection.client_new
+    result = conn.block_stream(0)
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_block_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.block_stream(0)
+    end
+  end
+
+  def test_unblock_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.unblock_stream(0)
+    end
+  end
+
+  def test_stream_writable_returns_boolean
+    conn = Nghttp3::Connection.client_new
+    result = conn.stream_writable?(0)
+    assert_includes [true, false], result
+  ensure
+    conn&.close
+  end
+
+  def test_stream_writable_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.stream_writable?(0)
+    end
+  end
+
+  def test_close_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.close_stream(0, Nghttp3::H3_NO_ERROR)
+    end
+  end
+
+  def test_shutdown_stream_write_returns_self
+    conn = Nghttp3::Connection.client_new
+    result = conn.shutdown_stream_write(0)
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_shutdown_stream_write_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.shutdown_stream_write(0)
+    end
+  end
+
+  def test_resume_stream_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.resume_stream(0)
+    end
+  end
+
+  def test_h3_error_code_constants
+    assert_equal 0x0100, Nghttp3::H3_NO_ERROR
+    assert_equal 0x0101, Nghttp3::H3_GENERAL_PROTOCOL_ERROR
+    assert_equal 0x0102, Nghttp3::H3_INTERNAL_ERROR
+    assert_kind_of Integer, Nghttp3::H3_STREAM_CREATION_ERROR
+    assert_kind_of Integer, Nghttp3::H3_CLOSED_CRITICAL_STREAM
+    assert_kind_of Integer, Nghttp3::H3_FRAME_UNEXPECTED
+    assert_kind_of Integer, Nghttp3::H3_FRAME_ERROR
+    assert_kind_of Integer, Nghttp3::H3_EXCESSIVE_LOAD
+    assert_kind_of Integer, Nghttp3::H3_ID_ERROR
+    assert_kind_of Integer, Nghttp3::H3_SETTINGS_ERROR
+    assert_kind_of Integer, Nghttp3::H3_MISSING_SETTINGS
+    assert_kind_of Integer, Nghttp3::H3_REQUEST_REJECTED
+    assert_kind_of Integer, Nghttp3::H3_REQUEST_CANCELLED
+    assert_kind_of Integer, Nghttp3::H3_REQUEST_INCOMPLETE
+    assert_kind_of Integer, Nghttp3::H3_MESSAGE_ERROR
+    assert_kind_of Integer, Nghttp3::H3_CONNECT_ERROR
+    assert_kind_of Integer, Nghttp3::H3_VERSION_FALLBACK
+  end
 end
