@@ -45,7 +45,9 @@ nghttp3_nv nghttp3_rb_nv_to_c(VALUE rb_nv);
 /* Connection helper */
 nghttp3_conn *nghttp3_rb_get_conn(VALUE rb_conn);
 
-/* Connection init function */
+/* Init functions */
+void Init_nghttp3_settings(void);
+void Init_nghttp3_nv(void);
 void Init_nghttp3_connection(void);
 
 #endif /* NGHTTP3_RUBY_H */
