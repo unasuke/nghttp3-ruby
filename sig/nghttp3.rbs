@@ -6,8 +6,30 @@ module Nghttp3
   NGHTTP3_VERSION_NUM: Integer
   NGHTTP3_VERSION_AGE: Integer
 
+  # nghttp3 error code constants
+  NGHTTP3_ERR_INVALID_ARGUMENT: Integer
+  NGHTTP3_ERR_INVALID_STATE: Integer
+  NGHTTP3_ERR_WOULDBLOCK: Integer
+  NGHTTP3_ERR_STREAM_IN_USE: Integer
+  NGHTTP3_ERR_MALFORMED_HTTP_HEADER: Integer
+  NGHTTP3_ERR_MALFORMED_HTTP_MESSAGING: Integer
+  NGHTTP3_ERR_QPACK_FATAL: Integer
+  NGHTTP3_ERR_QPACK_HEADER_TOO_LARGE: Integer
+  NGHTTP3_ERR_STREAM_NOT_FOUND: Integer
+  NGHTTP3_ERR_CONN_CLOSING: Integer
+  NGHTTP3_ERR_STREAM_DATA_OVERFLOW: Integer
+  NGHTTP3_ERR_FATAL: Integer
+  NGHTTP3_ERR_NOMEM: Integer
+  NGHTTP3_ERR_CALLBACK_FAILURE: Integer
+
   # Returns runtime version info, or nil if least_version requirement not met
   def self.library_version: (?Integer least_version) -> Info?
+
+  # Returns true if the given error code represents a fatal error
+  def self.err_is_fatal?: (Integer error_code) -> bool
+
+  # Returns a textual representation of the given error code
+  def self.strerror: (Integer error_code) -> String
 
   class Info
     def age: () -> Integer
@@ -16,5 +38,47 @@ module Nghttp3
   end
 
   class Error < StandardError
+  end
+
+  class InvalidArgumentError < Error
+  end
+
+  class InvalidStateError < Error
+  end
+
+  class WouldBlockError < Error
+  end
+
+  class StreamInUseError < Error
+  end
+
+  class MalformedHTTPHeaderError < Error
+  end
+
+  class MalformedHTTPMessagingError < Error
+  end
+
+  class QPACKFatalError < Error
+  end
+
+  class QPACKHeaderTooLargeError < Error
+  end
+
+  class StreamNotFoundError < Error
+  end
+
+  class ConnClosingError < Error
+  end
+
+  class StreamDataOverflowError < Error
+  end
+
+  class FatalError < Error
+  end
+
+  class NoMemError < Error
+  end
+
+  class CallbackFailureError < Error
   end
 end
