@@ -22,6 +22,13 @@ module Nghttp3
   NGHTTP3_ERR_NOMEM: Integer
   NGHTTP3_ERR_CALLBACK_FAILURE: Integer
 
+  # NV flag constants
+  NV_FLAG_NONE: Integer
+  NV_FLAG_NEVER_INDEX: Integer
+  NV_FLAG_NO_COPY_NAME: Integer
+  NV_FLAG_NO_COPY_VALUE: Integer
+  NV_FLAG_TRY_INDEX: Integer
+
   # Returns runtime version info, or nil if least_version requirement not met
   def self.library_version: (?Integer least_version) -> Info?
 
@@ -80,5 +87,37 @@ module Nghttp3
   end
 
   class CallbackFailureError < Error
+  end
+
+  class Settings
+    def self.default: () -> Settings
+
+    def initialize: () -> void
+
+    def max_field_section_size: () -> Integer
+    def max_field_section_size=: (Integer value) -> Integer
+
+    def qpack_max_dtable_capacity: () -> Integer
+    def qpack_max_dtable_capacity=: (Integer value) -> Integer
+
+    def qpack_encoder_max_dtable_capacity: () -> Integer
+    def qpack_encoder_max_dtable_capacity=: (Integer value) -> Integer
+
+    def qpack_blocked_streams: () -> Integer
+    def qpack_blocked_streams=: (Integer value) -> Integer
+
+    def enable_connect_protocol: () -> bool
+    def enable_connect_protocol=: (boolish value) -> boolish
+
+    def h3_datagram: () -> bool
+    def h3_datagram=: (boolish value) -> boolish
+  end
+
+  class NV
+    def initialize: (String name, String value, ?flags: Integer) -> void
+
+    def name: () -> String
+    def value: () -> String
+    def flags: () -> Integer
   end
 end

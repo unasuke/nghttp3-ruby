@@ -3,6 +3,8 @@
 
 VALUE rb_mNghttp3;
 VALUE rb_cNghttp3Info;
+VALUE rb_cNghttp3Settings;
+VALUE rb_cNghttp3NV;
 VALUE rb_eNghttp3Error;
 
 /* Error classes */
@@ -157,6 +159,223 @@ static VALUE rb_nghttp3_strerror(VALUE self, VALUE rb_error_code) {
   return rb_str_new_cstr(str);
 }
 
+/* ============================================================
+ * Settings class
+ * ============================================================ */
+
+typedef struct {
+  nghttp3_settings settings;
+} SettingsObj;
+
+static void settings_free(void *ptr) { xfree(ptr); }
+
+static size_t settings_memsize(const void *ptr) { return sizeof(SettingsObj); }
+
+static const rb_data_type_t settings_data_type = {
+    .wrap_struct_name = "nghttp3_settings_rb",
+    .function =
+        {
+            .dmark = NULL,
+            .dfree = settings_free,
+            .dsize = settings_memsize,
+        },
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+static VALUE settings_alloc(VALUE klass) {
+  SettingsObj *obj;
+  VALUE self =
+      TypedData_Make_Struct(klass, SettingsObj, &settings_data_type, obj);
+  memset(&obj->settings, 0, sizeof(nghttp3_settings));
+  return self;
+}
+
+/*
+ * Returns a pointer to the underlying nghttp3_settings structure.
+ */
+nghttp3_settings *nghttp3_rb_get_settings(VALUE rb_settings) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(rb_settings, SettingsObj, &settings_data_type, obj);
+  return &obj->settings;
+}
+
+/*
+ * call-seq:
+ *   Settings.new -> Settings
+ *
+ * Creates a new Settings object with all values set to zero.
+ */
+static VALUE rb_nghttp3_settings_initialize(VALUE self) { return self; }
+
+/*
+ * call-seq:
+ *   Settings.default -> Settings
+ *
+ * Creates a new Settings object with default values from nghttp3.
+ */
+static VALUE rb_nghttp3_settings_default(VALUE klass) {
+  VALUE self = settings_alloc(klass);
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  nghttp3_settings_default(&obj->settings);
+  return self;
+}
+
+/* Settings getters */
+static VALUE rb_nghttp3_settings_get_max_field_section_size(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return ULL2NUM(obj->settings.max_field_section_size);
+}
+
+static VALUE rb_nghttp3_settings_get_qpack_max_dtable_capacity(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return SIZET2NUM(obj->settings.qpack_max_dtable_capacity);
+}
+
+static VALUE
+rb_nghttp3_settings_get_qpack_encoder_max_dtable_capacity(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return SIZET2NUM(obj->settings.qpack_encoder_max_dtable_capacity);
+}
+
+static VALUE rb_nghttp3_settings_get_qpack_blocked_streams(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return SIZET2NUM(obj->settings.qpack_blocked_streams);
+}
+
+static VALUE rb_nghttp3_settings_get_enable_connect_protocol(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return obj->settings.enable_connect_protocol ? Qtrue : Qfalse;
+}
+
+static VALUE rb_nghttp3_settings_get_h3_datagram(VALUE self) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  return obj->settings.h3_datagram ? Qtrue : Qfalse;
+}
+
+/* Settings setters */
+static VALUE rb_nghttp3_settings_set_max_field_section_size(VALUE self,
+                                                            VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.max_field_section_size = NUM2ULL(val);
+  return val;
+}
+
+static VALUE rb_nghttp3_settings_set_qpack_max_dtable_capacity(VALUE self,
+                                                               VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.qpack_max_dtable_capacity = NUM2SIZET(val);
+  return val;
+}
+
+static VALUE
+rb_nghttp3_settings_set_qpack_encoder_max_dtable_capacity(VALUE self,
+                                                          VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.qpack_encoder_max_dtable_capacity = NUM2SIZET(val);
+  return val;
+}
+
+static VALUE rb_nghttp3_settings_set_qpack_blocked_streams(VALUE self,
+                                                           VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.qpack_blocked_streams = NUM2SIZET(val);
+  return val;
+}
+
+static VALUE rb_nghttp3_settings_set_enable_connect_protocol(VALUE self,
+                                                             VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.enable_connect_protocol = RTEST(val) ? 1 : 0;
+  return val;
+}
+
+static VALUE rb_nghttp3_settings_set_h3_datagram(VALUE self, VALUE val) {
+  SettingsObj *obj;
+  TypedData_Get_Struct(self, SettingsObj, &settings_data_type, obj);
+  obj->settings.h3_datagram = RTEST(val) ? 1 : 0;
+  return val;
+}
+
+/* ============================================================
+ * NV class
+ * ============================================================ */
+
+/*
+ * Converts a Ruby NV object to a C nghttp3_nv structure.
+ * Note: The returned structure contains pointers to Ruby string data,
+ * so the Ruby strings must remain valid while the structure is in use.
+ */
+nghttp3_nv nghttp3_rb_nv_to_c(VALUE rb_nv) {
+  nghttp3_nv nv;
+  VALUE name = rb_iv_get(rb_nv, "@name");
+  VALUE value = rb_iv_get(rb_nv, "@value");
+  VALUE flags = rb_iv_get(rb_nv, "@flags");
+
+  StringValue(name);
+  StringValue(value);
+
+  nv.name = (uint8_t *)RSTRING_PTR(name);
+  nv.namelen = RSTRING_LEN(name);
+  nv.value = (uint8_t *)RSTRING_PTR(value);
+  nv.valuelen = RSTRING_LEN(value);
+  nv.flags = NIL_P(flags) ? 0 : NUM2UINT(flags);
+
+  return nv;
+}
+
+/*
+ * call-seq:
+ *   NV.new(name, value, flags: 0) -> NV
+ *
+ * Creates a new NV (name-value pair) object representing an HTTP header.
+ */
+static VALUE rb_nghttp3_nv_initialize(int argc, VALUE *argv, VALUE self) {
+  VALUE name, value, opts;
+  VALUE flags = INT2FIX(0);
+
+  rb_scan_args(argc, argv, "2:", &name, &value, &opts);
+
+  StringValue(name);
+  StringValue(value);
+
+  if (!NIL_P(opts)) {
+    VALUE rb_flags = rb_hash_aref(opts, ID2SYM(rb_intern("flags")));
+    if (!NIL_P(rb_flags)) {
+      flags = rb_flags;
+    }
+  }
+
+  rb_iv_set(self, "@name", rb_str_freeze(rb_str_dup(name)));
+  rb_iv_set(self, "@value", rb_str_freeze(rb_str_dup(value)));
+  rb_iv_set(self, "@flags", flags);
+
+  return self;
+}
+
+static VALUE rb_nghttp3_nv_get_name(VALUE self) {
+  return rb_iv_get(self, "@name");
+}
+
+static VALUE rb_nghttp3_nv_get_value(VALUE self) {
+  return rb_iv_get(self, "@value");
+}
+
+static VALUE rb_nghttp3_nv_get_flags(VALUE self) {
+  return rb_iv_get(self, "@flags");
+}
+
 RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   /* Define main module */
   rb_mNghttp3 = rb_define_module("Nghttp3");
@@ -248,4 +467,61 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   rb_define_singleton_method(rb_mNghttp3, "err_is_fatal?",
                              rb_nghttp3_err_is_fatal, 1);
   rb_define_singleton_method(rb_mNghttp3, "strerror", rb_nghttp3_strerror, 1);
+
+  /* Define NV flag constants */
+  rb_define_const(rb_mNghttp3, "NV_FLAG_NONE", UINT2NUM(NGHTTP3_NV_FLAG_NONE));
+  rb_define_const(rb_mNghttp3, "NV_FLAG_NEVER_INDEX",
+                  UINT2NUM(NGHTTP3_NV_FLAG_NEVER_INDEX));
+  rb_define_const(rb_mNghttp3, "NV_FLAG_NO_COPY_NAME",
+                  UINT2NUM(NGHTTP3_NV_FLAG_NO_COPY_NAME));
+  rb_define_const(rb_mNghttp3, "NV_FLAG_NO_COPY_VALUE",
+                  UINT2NUM(NGHTTP3_NV_FLAG_NO_COPY_VALUE));
+  rb_define_const(rb_mNghttp3, "NV_FLAG_TRY_INDEX",
+                  UINT2NUM(NGHTTP3_NV_FLAG_TRY_INDEX));
+
+  /* Define Settings class */
+  rb_cNghttp3Settings =
+      rb_define_class_under(rb_mNghttp3, "Settings", rb_cObject);
+  rb_define_alloc_func(rb_cNghttp3Settings, settings_alloc);
+  rb_define_method(rb_cNghttp3Settings, "initialize",
+                   rb_nghttp3_settings_initialize, 0);
+  rb_define_singleton_method(rb_cNghttp3Settings, "default",
+                             rb_nghttp3_settings_default, 0);
+
+  /* Settings getters */
+  rb_define_method(rb_cNghttp3Settings, "max_field_section_size",
+                   rb_nghttp3_settings_get_max_field_section_size, 0);
+  rb_define_method(rb_cNghttp3Settings, "qpack_max_dtable_capacity",
+                   rb_nghttp3_settings_get_qpack_max_dtable_capacity, 0);
+  rb_define_method(rb_cNghttp3Settings, "qpack_encoder_max_dtable_capacity",
+                   rb_nghttp3_settings_get_qpack_encoder_max_dtable_capacity,
+                   0);
+  rb_define_method(rb_cNghttp3Settings, "qpack_blocked_streams",
+                   rb_nghttp3_settings_get_qpack_blocked_streams, 0);
+  rb_define_method(rb_cNghttp3Settings, "enable_connect_protocol",
+                   rb_nghttp3_settings_get_enable_connect_protocol, 0);
+  rb_define_method(rb_cNghttp3Settings, "h3_datagram",
+                   rb_nghttp3_settings_get_h3_datagram, 0);
+
+  /* Settings setters */
+  rb_define_method(rb_cNghttp3Settings, "max_field_section_size=",
+                   rb_nghttp3_settings_set_max_field_section_size, 1);
+  rb_define_method(rb_cNghttp3Settings, "qpack_max_dtable_capacity=",
+                   rb_nghttp3_settings_set_qpack_max_dtable_capacity, 1);
+  rb_define_method(rb_cNghttp3Settings, "qpack_encoder_max_dtable_capacity=",
+                   rb_nghttp3_settings_set_qpack_encoder_max_dtable_capacity,
+                   1);
+  rb_define_method(rb_cNghttp3Settings, "qpack_blocked_streams=",
+                   rb_nghttp3_settings_set_qpack_blocked_streams, 1);
+  rb_define_method(rb_cNghttp3Settings, "enable_connect_protocol=",
+                   rb_nghttp3_settings_set_enable_connect_protocol, 1);
+  rb_define_method(rb_cNghttp3Settings,
+                   "h3_datagram=", rb_nghttp3_settings_set_h3_datagram, 1);
+
+  /* Define NV class */
+  rb_cNghttp3NV = rb_define_class_under(rb_mNghttp3, "NV", rb_cObject);
+  rb_define_method(rb_cNghttp3NV, "initialize", rb_nghttp3_nv_initialize, -1);
+  rb_define_method(rb_cNghttp3NV, "name", rb_nghttp3_nv_get_name, 0);
+  rb_define_method(rb_cNghttp3NV, "value", rb_nghttp3_nv_get_value, 0);
+  rb_define_method(rb_cNghttp3NV, "flags", rb_nghttp3_nv_get_flags, 0);
 }

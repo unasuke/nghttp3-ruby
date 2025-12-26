@@ -158,4 +158,122 @@ class TestNghttp3 < Minitest::Test
       raise Nghttp3::NoMemError, "test"
     end
   end
+
+  # NV flag constant tests
+  def test_nv_flag_constants_exist
+    assert_equal 0x00, Nghttp3::NV_FLAG_NONE
+    assert_equal 0x01, Nghttp3::NV_FLAG_NEVER_INDEX
+    assert_equal 0x02, Nghttp3::NV_FLAG_NO_COPY_NAME
+    assert_equal 0x04, Nghttp3::NV_FLAG_NO_COPY_VALUE
+    assert_equal 0x08, Nghttp3::NV_FLAG_TRY_INDEX
+  end
+
+  # Settings class tests
+  def test_settings_new_creates_empty_settings
+    settings = Nghttp3::Settings.new
+    assert_kind_of Nghttp3::Settings, settings
+    assert_equal 0, settings.max_field_section_size
+    assert_equal 0, settings.qpack_max_dtable_capacity
+    assert_equal 0, settings.qpack_encoder_max_dtable_capacity
+    assert_equal 0, settings.qpack_blocked_streams
+    assert_equal false, settings.enable_connect_protocol
+    assert_equal false, settings.h3_datagram
+  end
+
+  def test_settings_default_creates_settings_with_default_values
+    settings = Nghttp3::Settings.default
+    assert_kind_of Nghttp3::Settings, settings
+
+    # Check default values from nghttp3_settings_default
+    assert_operator settings.max_field_section_size, :>, 0
+    assert_equal 0, settings.qpack_max_dtable_capacity
+    assert_equal 4096, settings.qpack_encoder_max_dtable_capacity
+    assert_equal 0, settings.qpack_blocked_streams
+    assert_equal false, settings.enable_connect_protocol
+  end
+
+  def test_settings_max_field_section_size_getter_and_setter
+    settings = Nghttp3::Settings.new
+    settings.max_field_section_size = 16384
+    assert_equal 16384, settings.max_field_section_size
+  end
+
+  def test_settings_qpack_max_dtable_capacity_getter_and_setter
+    settings = Nghttp3::Settings.new
+    settings.qpack_max_dtable_capacity = 4096
+    assert_equal 4096, settings.qpack_max_dtable_capacity
+  end
+
+  def test_settings_qpack_encoder_max_dtable_capacity_getter_and_setter
+    settings = Nghttp3::Settings.new
+    settings.qpack_encoder_max_dtable_capacity = 8192
+    assert_equal 8192, settings.qpack_encoder_max_dtable_capacity
+  end
+
+  def test_settings_qpack_blocked_streams_getter_and_setter
+    settings = Nghttp3::Settings.new
+    settings.qpack_blocked_streams = 100
+    assert_equal 100, settings.qpack_blocked_streams
+  end
+
+  def test_settings_enable_connect_protocol_getter_and_setter
+    settings = Nghttp3::Settings.new
+    assert_equal false, settings.enable_connect_protocol
+
+    settings.enable_connect_protocol = true
+    assert_equal true, settings.enable_connect_protocol
+
+    settings.enable_connect_protocol = false
+    assert_equal false, settings.enable_connect_protocol
+  end
+
+  def test_settings_h3_datagram_getter_and_setter
+    settings = Nghttp3::Settings.new
+    assert_equal false, settings.h3_datagram
+
+    settings.h3_datagram = true
+    assert_equal true, settings.h3_datagram
+
+    settings.h3_datagram = false
+    assert_equal false, settings.h3_datagram
+  end
+
+  # NV class tests
+  def test_nv_new_creates_nv_with_name_and_value
+    nv = Nghttp3::NV.new(":method", "GET")
+    assert_kind_of Nghttp3::NV, nv
+    assert_equal ":method", nv.name
+    assert_equal "GET", nv.value
+    assert_equal 0, nv.flags
+  end
+
+  def test_nv_new_with_flags
+    nv = Nghttp3::NV.new(":path", "/", flags: Nghttp3::NV_FLAG_NEVER_INDEX)
+    assert_equal ":path", nv.name
+    assert_equal "/", nv.value
+    assert_equal Nghttp3::NV_FLAG_NEVER_INDEX, nv.flags
+  end
+
+  def test_nv_name_is_frozen
+    nv = Nghttp3::NV.new("content-type", "text/html")
+    assert nv.name.frozen?
+    assert nv.value.frozen?
+  end
+
+  def test_nv_with_various_headers
+    headers = [
+      [":method", "POST"],
+      [":path", "/api/v1/users"],
+      [":scheme", "https"],
+      [":authority", "example.com"],
+      ["content-type", "application/json"],
+      ["accept", "*/*"]
+    ]
+
+    headers.each do |name, value|
+      nv = Nghttp3::NV.new(name, value)
+      assert_equal name, nv.name
+      assert_equal value, nv.value
+    end
+  end
 end

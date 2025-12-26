@@ -24,8 +24,18 @@ extern VALUE rb_eNghttp3FatalError;
 extern VALUE rb_eNghttp3NoMemError;
 extern VALUE rb_eNghttp3CallbackFailureError;
 
+/* Data structure classes */
+extern VALUE rb_cNghttp3Settings;
+extern VALUE rb_cNghttp3NV;
+
 /* Helper functions */
 VALUE nghttp3_rb_error_class_for_code(int error_code);
 void nghttp3_rb_raise(int error_code, const char *fmt, ...);
+
+/* Settings helper */
+nghttp3_settings *nghttp3_rb_get_settings(VALUE rb_settings);
+
+/* NV helper */
+nghttp3_nv nghttp3_rb_nv_to_c(VALUE rb_nv);
 
 #endif /* NGHTTP3_RUBY_H */
