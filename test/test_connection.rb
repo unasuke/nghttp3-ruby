@@ -260,4 +260,183 @@ class TestNghttp3Connection < Minitest::Test
     assert_kind_of Integer, Nghttp3::H3_CONNECT_ERROR
     assert_kind_of Integer, Nghttp3::H3_VERSION_FALLBACK
   end
+
+  # HTTP operation tests
+
+  def test_data_flag_constants
+    assert_equal 0x00, Nghttp3::DATA_FLAG_NONE
+    assert_equal 0x01, Nghttp3::DATA_FLAG_EOF
+    assert_equal 0x02, Nghttp3::DATA_FLAG_NO_END_STREAM
+  end
+
+  def test_submit_request_without_body
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+
+    headers = [
+      Nghttp3::NV.new(":method", "GET"),
+      Nghttp3::NV.new(":path", "/"),
+      Nghttp3::NV.new(":scheme", "https"),
+      Nghttp3::NV.new(":authority", "example.com"),
+    ]
+
+    result = conn.submit_request(0, headers)
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_submit_request_with_body
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+
+    headers = [
+      Nghttp3::NV.new(":method", "POST"),
+      Nghttp3::NV.new(":path", "/"),
+      Nghttp3::NV.new(":scheme", "https"),
+      Nghttp3::NV.new(":authority", "example.com"),
+    ]
+
+    result = conn.submit_request(0, headers, body: "test body")
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_submit_request_raises_on_server_connection
+    conn = Nghttp3::Connection.server_new
+    headers = [Nghttp3::NV.new(":status", "200")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_request(0, headers)
+    end
+  ensure
+    conn&.close
+  end
+
+  def test_submit_request_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    headers = [Nghttp3::NV.new(":method", "GET")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_request(0, headers)
+    end
+  end
+
+  def test_submit_response_raises_on_client_connection
+    conn = Nghttp3::Connection.client_new
+    headers = [Nghttp3::NV.new(":status", "200")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_response(0, headers)
+    end
+  ensure
+    conn&.close
+  end
+
+  def test_submit_response_raises_on_closed_connection
+    conn = Nghttp3::Connection.server_new
+    conn.close
+    headers = [Nghttp3::NV.new(":status", "200")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_response(0, headers)
+    end
+  end
+
+  def test_submit_info_raises_on_closed_connection
+    conn = Nghttp3::Connection.server_new
+    conn.close
+    headers = [Nghttp3::NV.new(":status", "100")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_info(0, headers)
+    end
+  end
+
+  def test_submit_trailers_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+    trailers = [Nghttp3::NV.new("trailer-key", "value")]
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_trailers(0, trailers)
+    end
+  end
+
+  def test_submit_shutdown_notice_returns_self
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+    result = conn.submit_shutdown_notice
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_submit_shutdown_notice_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.submit_shutdown_notice
+    end
+  end
+
+  def test_shutdown_returns_self
+    conn = Nghttp3::Connection.client_new
+    conn.bind_control_stream(2)
+    conn.bind_qpack_streams(6, 10)
+    conn.submit_shutdown_notice
+    result = conn.shutdown
+    assert_same conn, result
+  ensure
+    conn&.close
+  end
+
+  def test_shutdown_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.shutdown
+    end
+  end
+
+  def test_set_and_get_stream_user_data
+    conn = Nghttp3::Connection.client_new
+    data = { id: 123, name: "test" }
+
+    result = conn.set_stream_user_data(0, data)
+    assert_same conn, result
+
+    retrieved = conn.get_stream_user_data(0)
+    assert_equal data, retrieved
+  ensure
+    conn&.close
+  end
+
+  def test_get_stream_user_data_returns_nil_for_unknown_stream
+    conn = Nghttp3::Connection.client_new
+    result = conn.get_stream_user_data(999)
+    assert_nil result
+  ensure
+    conn&.close
+  end
+
+  def test_stream_user_data_raises_on_closed_connection
+    conn = Nghttp3::Connection.client_new
+    conn.close
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.set_stream_user_data(0, "data")
+    end
+
+    assert_raises(Nghttp3::InvalidStateError) do
+      conn.get_stream_user_data(0)
+    end
+  end
 end

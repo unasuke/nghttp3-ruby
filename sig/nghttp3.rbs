@@ -29,6 +29,11 @@ module Nghttp3
   NV_FLAG_NO_COPY_VALUE: Integer
   NV_FLAG_TRY_INDEX: Integer
 
+  # Data flag constants
+  DATA_FLAG_NONE: Integer
+  DATA_FLAG_EOF: Integer
+  DATA_FLAG_NO_END_STREAM: Integer
+
   # HTTP/3 application error code constants
   H3_NO_ERROR: Integer
   H3_GENERAL_PROTOCOL_ERROR: Integer

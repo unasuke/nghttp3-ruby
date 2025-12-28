@@ -55,5 +55,31 @@ module Nghttp3
 
     # Resumes a stream that was blocked for input data
     def resume_stream: (Integer stream_id) -> self
+
+    # HTTP operations
+
+    # Submits an HTTP request (client only)
+    def submit_request: (Integer stream_id, Array[NV] headers, ?body: String?) ?{ (Integer stream_id) -> (String | Symbol | nil) } -> self
+
+    # Submits an HTTP response (server only)
+    def submit_response: (Integer stream_id, Array[NV] headers, ?body: String?) ?{ (Integer stream_id) -> (String | Symbol | nil) } -> self
+
+    # Submits a 1xx informational response
+    def submit_info: (Integer stream_id, Array[NV] headers) -> self
+
+    # Submits trailer headers (implicitly ends the stream)
+    def submit_trailers: (Integer stream_id, Array[NV] trailers) -> self
+
+    # Signals the intention to shut down the connection gracefully
+    def submit_shutdown_notice: () -> self
+
+    # Initiates graceful shutdown
+    def shutdown: () -> self
+
+    # Associates arbitrary data with a stream
+    def set_stream_user_data: (Integer stream_id, untyped data) -> self
+
+    # Returns data associated with a stream
+    def get_stream_user_data: (Integer stream_id) -> untyped
   end
 end

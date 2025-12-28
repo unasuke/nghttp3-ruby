@@ -248,6 +248,14 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   rb_define_const(rb_mNghttp3, "H3_VERSION_FALLBACK",
                   INT2NUM(NGHTTP3_H3_VERSION_FALLBACK));
 
+  /* Define data flag constants */
+  rb_define_const(rb_mNghttp3, "DATA_FLAG_NONE",
+                  UINT2NUM(NGHTTP3_DATA_FLAG_NONE));
+  rb_define_const(rb_mNghttp3, "DATA_FLAG_EOF",
+                  UINT2NUM(NGHTTP3_DATA_FLAG_EOF));
+  rb_define_const(rb_mNghttp3, "DATA_FLAG_NO_END_STREAM",
+                  UINT2NUM(NGHTTP3_DATA_FLAG_NO_END_STREAM));
+
   /* Define specific error classes */
   rb_eNghttp3InvalidArgumentError = rb_define_class_under(
       rb_mNghttp3, "InvalidArgumentError", rb_eNghttp3Error);
@@ -288,4 +296,5 @@ RUBY_FUNC_EXPORTED void Init_nghttp3(void) {
   Init_nghttp3_nv();
   Init_nghttp3_callbacks();
   Init_nghttp3_connection();
+  Init_nghttp3_qpack();
 }

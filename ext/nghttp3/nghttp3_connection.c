@@ -4,8 +4,11 @@ VALUE rb_cNghttp3Connection;
 
 typedef struct {
   nghttp3_conn *conn;
-  VALUE settings;  /* Prevent Settings from being GC'd */
-  VALUE callbacks; /* Prevent Callbacks from being GC'd */
+  VALUE settings;            /* Prevent Settings from being GC'd */
+  VALUE callbacks;           /* Prevent Callbacks from being GC'd */
+  VALUE stream_data_readers; /* stream_id => Proc/String for body data */
+  VALUE stream_user_data;    /* stream_id => arbitrary user data */
+  VALUE pending_data;        /* stream_id => [String, ...] for ACK tracking */
   int is_closed;
   int is_server;
 } ConnectionObj;
@@ -17,6 +20,15 @@ static void connection_mark(void *ptr) {
   }
   if (obj->callbacks != Qnil) {
     rb_gc_mark(obj->callbacks);
+  }
+  if (obj->stream_data_readers != Qnil) {
+    rb_gc_mark(obj->stream_data_readers);
+  }
+  if (obj->stream_user_data != Qnil) {
+    rb_gc_mark(obj->stream_user_data);
+  }
+  if (obj->pending_data != Qnil) {
+    rb_gc_mark(obj->pending_data);
   }
 }
 
@@ -51,6 +63,9 @@ static VALUE connection_alloc(VALUE klass) {
   obj->conn = NULL;
   obj->settings = Qnil;
   obj->callbacks = Qnil;
+  obj->stream_data_readers = rb_hash_new();
+  obj->stream_user_data = rb_hash_new();
+  obj->pending_data = rb_hash_new();
   obj->is_closed = 0;
   obj->is_server = 0;
   return self;
@@ -620,6 +635,390 @@ static VALUE rb_nghttp3_connection_resume_stream(VALUE self,
   return self;
 }
 
+/*
+ * Callback function for providing body data to nghttp3.
+ */
+static nghttp3_ssize read_data_callback(nghttp3_conn *conn, int64_t stream_id,
+                                        nghttp3_vec *vec, size_t veccnt,
+                                        uint32_t *pflags, void *conn_user_data,
+                                        void *stream_user_data) {
+  VALUE rb_conn = (VALUE)conn_user_data;
+  ConnectionObj *obj;
+  VALUE readers, reader, result;
+  VALUE rb_stream_id = LL2NUM(stream_id);
+
+  TypedData_Get_Struct(rb_conn, ConnectionObj, &connection_data_type, obj);
+  readers = obj->stream_data_readers;
+  reader = rb_hash_aref(readers, rb_stream_id);
+
+  if (NIL_P(reader)) {
+    *pflags |= NGHTTP3_DATA_FLAG_EOF;
+    return 0;
+  }
+
+  if (RB_TYPE_P(reader, T_STRING)) {
+    /* String: return all data at once */
+    vec[0].base = (uint8_t *)RSTRING_PTR(reader);
+    vec[0].len = RSTRING_LEN(reader);
+    *pflags |= NGHTTP3_DATA_FLAG_EOF;
+
+    /* Keep string in pending_data until ACKed */
+    VALUE pending = rb_hash_aref(obj->pending_data, rb_stream_id);
+    if (NIL_P(pending)) {
+      pending = rb_ary_new();
+      rb_hash_aset(obj->pending_data, rb_stream_id, pending);
+    }
+    rb_ary_push(pending, reader);
+    rb_hash_delete(readers, rb_stream_id);
+    return 1;
+  }
+
+  /* Proc: call it to get data */
+  result = rb_funcall(reader, rb_intern("call"), 1, rb_stream_id);
+
+  if (NIL_P(result)) {
+    *pflags |= NGHTTP3_DATA_FLAG_EOF;
+    rb_hash_delete(readers, rb_stream_id);
+    return 0;
+  }
+
+  if (SYMBOL_P(result) && SYM2ID(result) == rb_intern("wouldblock")) {
+    return NGHTTP3_ERR_WOULDBLOCK;
+  }
+
+  /* Result should be a String */
+  StringValue(result);
+
+  /* Store in pending_data for GC protection until ACKed */
+  VALUE pending = rb_hash_aref(obj->pending_data, rb_stream_id);
+  if (NIL_P(pending)) {
+    pending = rb_ary_new();
+    rb_hash_aset(obj->pending_data, rb_stream_id, pending);
+  }
+  rb_ary_push(pending, result);
+
+  vec[0].base = (uint8_t *)RSTRING_PTR(result);
+  vec[0].len = RSTRING_LEN(result);
+
+  return 1;
+}
+
+/* Static data_reader structure for use in submit functions */
+static const nghttp3_data_reader data_reader = {.read_data =
+                                                    read_data_callback};
+
+/*
+ * call-seq:
+ *   connection.submit_request(stream_id, headers, body: nil) -> self
+ *   connection.submit_request(stream_id, headers) { |stream_id| ... } -> self
+ *
+ * Submits an HTTP request on the given stream.
+ * Headers should be an array of Nghttp3::NV objects.
+ */
+static VALUE rb_nghttp3_connection_submit_request(int argc, VALUE *argv,
+                                                  VALUE self) {
+  VALUE rb_stream_id, rb_headers, rb_opts, rb_body;
+  ConnectionObj *obj;
+  int64_t stream_id;
+  nghttp3_nv *nva;
+  size_t nvlen, i;
+  int rv;
+  int has_body = 0;
+
+  rb_scan_args(argc, argv, "2:", &rb_stream_id, &rb_headers, &rb_opts);
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  if (obj->is_server) {
+    rb_raise(rb_eNghttp3InvalidStateError,
+             "submit_request can only be called on client connections");
+  }
+
+  stream_id = NUM2LL(rb_stream_id);
+  Check_Type(rb_headers, T_ARRAY);
+  nvlen = RARRAY_LEN(rb_headers);
+
+  /* Allocate and convert headers */
+  nva = ALLOCA_N(nghttp3_nv, nvlen);
+  for (i = 0; i < nvlen; i++) {
+    VALUE rb_nv = rb_ary_entry(rb_headers, i);
+    nva[i] = nghttp3_rb_nv_to_c(rb_nv);
+  }
+
+  /* Check for body */
+  rb_body = Qnil;
+  if (!NIL_P(rb_opts)) {
+    rb_body = rb_hash_aref(rb_opts, ID2SYM(rb_intern("body")));
+  }
+
+  if (!NIL_P(rb_body)) {
+    StringValue(rb_body);
+    rb_hash_aset(obj->stream_data_readers, LL2NUM(stream_id), rb_body);
+    has_body = 1;
+  } else if (rb_block_given_p()) {
+    VALUE block = rb_block_proc();
+    rb_hash_aset(obj->stream_data_readers, LL2NUM(stream_id), block);
+    has_body = 1;
+  }
+
+  rv = nghttp3_conn_submit_request(obj->conn, stream_id, nva, nvlen,
+                                   has_body ? &data_reader : NULL, NULL);
+
+  if (rv != 0) {
+    rb_hash_delete(obj->stream_data_readers, LL2NUM(stream_id));
+    nghttp3_rb_raise(rv, "Failed to submit request");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.submit_response(stream_id, headers, body: nil) -> self
+ *   connection.submit_response(stream_id, headers) { |stream_id| ... } -> self
+ *
+ * Submits an HTTP response on the given stream.
+ * Headers should be an array of Nghttp3::NV objects.
+ */
+static VALUE rb_nghttp3_connection_submit_response(int argc, VALUE *argv,
+                                                   VALUE self) {
+  VALUE rb_stream_id, rb_headers, rb_opts, rb_body;
+  ConnectionObj *obj;
+  int64_t stream_id;
+  nghttp3_nv *nva;
+  size_t nvlen, i;
+  int rv;
+  int has_body = 0;
+
+  rb_scan_args(argc, argv, "2:", &rb_stream_id, &rb_headers, &rb_opts);
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  if (!obj->is_server) {
+    rb_raise(rb_eNghttp3InvalidStateError,
+             "submit_response can only be called on server connections");
+  }
+
+  stream_id = NUM2LL(rb_stream_id);
+  Check_Type(rb_headers, T_ARRAY);
+  nvlen = RARRAY_LEN(rb_headers);
+
+  /* Allocate and convert headers */
+  nva = ALLOCA_N(nghttp3_nv, nvlen);
+  for (i = 0; i < nvlen; i++) {
+    VALUE rb_nv = rb_ary_entry(rb_headers, i);
+    nva[i] = nghttp3_rb_nv_to_c(rb_nv);
+  }
+
+  /* Check for body */
+  rb_body = Qnil;
+  if (!NIL_P(rb_opts)) {
+    rb_body = rb_hash_aref(rb_opts, ID2SYM(rb_intern("body")));
+  }
+
+  if (!NIL_P(rb_body)) {
+    StringValue(rb_body);
+    rb_hash_aset(obj->stream_data_readers, LL2NUM(stream_id), rb_body);
+    has_body = 1;
+  } else if (rb_block_given_p()) {
+    VALUE block = rb_block_proc();
+    rb_hash_aset(obj->stream_data_readers, LL2NUM(stream_id), block);
+    has_body = 1;
+  }
+
+  rv = nghttp3_conn_submit_response(obj->conn, stream_id, nva, nvlen,
+                                    has_body ? &data_reader : NULL);
+
+  if (rv != 0) {
+    rb_hash_delete(obj->stream_data_readers, LL2NUM(stream_id));
+    nghttp3_rb_raise(rv, "Failed to submit response");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.submit_info(stream_id, headers) -> self
+ *
+ * Submits a 1xx informational response on the given stream.
+ * Headers should be an array of Nghttp3::NV objects.
+ */
+static VALUE rb_nghttp3_connection_submit_info(VALUE self, VALUE rb_stream_id,
+                                               VALUE rb_headers) {
+  ConnectionObj *obj;
+  int64_t stream_id;
+  nghttp3_nv *nva;
+  size_t nvlen, i;
+  int rv;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  stream_id = NUM2LL(rb_stream_id);
+  Check_Type(rb_headers, T_ARRAY);
+  nvlen = RARRAY_LEN(rb_headers);
+
+  nva = ALLOCA_N(nghttp3_nv, nvlen);
+  for (i = 0; i < nvlen; i++) {
+    VALUE rb_nv = rb_ary_entry(rb_headers, i);
+    nva[i] = nghttp3_rb_nv_to_c(rb_nv);
+  }
+
+  rv = nghttp3_conn_submit_info(obj->conn, stream_id, nva, nvlen);
+
+  if (rv != 0) {
+    nghttp3_rb_raise(rv, "Failed to submit info");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.submit_trailers(stream_id, trailers) -> self
+ *
+ * Submits trailer headers on the given stream.
+ * This implicitly ends the stream.
+ * Trailers should be an array of Nghttp3::NV objects.
+ */
+static VALUE rb_nghttp3_connection_submit_trailers(VALUE self,
+                                                   VALUE rb_stream_id,
+                                                   VALUE rb_trailers) {
+  ConnectionObj *obj;
+  int64_t stream_id;
+  nghttp3_nv *nva;
+  size_t nvlen, i;
+  int rv;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  stream_id = NUM2LL(rb_stream_id);
+  Check_Type(rb_trailers, T_ARRAY);
+  nvlen = RARRAY_LEN(rb_trailers);
+
+  nva = ALLOCA_N(nghttp3_nv, nvlen);
+  for (i = 0; i < nvlen; i++) {
+    VALUE rb_nv = rb_ary_entry(rb_trailers, i);
+    nva[i] = nghttp3_rb_nv_to_c(rb_nv);
+  }
+
+  rv = nghttp3_conn_submit_trailers(obj->conn, stream_id, nva, nvlen);
+
+  if (rv != 0) {
+    nghttp3_rb_raise(rv, "Failed to submit trailers");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.submit_shutdown_notice -> self
+ *
+ * Signals the intention to shut down the connection gracefully.
+ * After calling this, no new streams will be accepted.
+ */
+static VALUE rb_nghttp3_connection_submit_shutdown_notice(VALUE self) {
+  ConnectionObj *obj;
+  int rv;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  rv = nghttp3_conn_submit_shutdown_notice(obj->conn);
+
+  if (rv != 0) {
+    nghttp3_rb_raise(rv, "Failed to submit shutdown notice");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.shutdown -> self
+ *
+ * Initiates graceful shutdown. Should be called after submit_shutdown_notice.
+ */
+static VALUE rb_nghttp3_connection_shutdown(VALUE self) {
+  ConnectionObj *obj;
+  int rv;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  rv = nghttp3_conn_shutdown(obj->conn);
+
+  if (rv != 0) {
+    nghttp3_rb_raise(rv, "Failed to shutdown connection");
+  }
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.set_stream_user_data(stream_id, data) -> self
+ *
+ * Associates arbitrary data with the given stream.
+ */
+static VALUE rb_nghttp3_connection_set_stream_user_data(VALUE self,
+                                                        VALUE rb_stream_id,
+                                                        VALUE rb_data) {
+  ConnectionObj *obj;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  rb_hash_aset(obj->stream_user_data, rb_stream_id, rb_data);
+
+  return self;
+}
+
+/*
+ * call-seq:
+ *   connection.get_stream_user_data(stream_id) -> Object or nil
+ *
+ * Returns the data associated with the given stream, or nil if none.
+ */
+static VALUE rb_nghttp3_connection_get_stream_user_data(VALUE self,
+                                                        VALUE rb_stream_id) {
+  ConnectionObj *obj;
+
+  TypedData_Get_Struct(self, ConnectionObj, &connection_data_type, obj);
+
+  if (obj->conn == NULL || obj->is_closed) {
+    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
+  }
+
+  return rb_hash_aref(obj->stream_user_data, rb_stream_id);
+}
+
 void Init_nghttp3_connection(void) {
   rb_cNghttp3Connection =
       rb_define_class_under(rb_mNghttp3, "Connection", rb_cObject);
@@ -668,4 +1067,22 @@ void Init_nghttp3_connection(void) {
                    rb_nghttp3_connection_shutdown_stream_write, 1);
   rb_define_method(rb_cNghttp3Connection, "resume_stream",
                    rb_nghttp3_connection_resume_stream, 1);
+
+  /* HTTP operation methods */
+  rb_define_method(rb_cNghttp3Connection, "submit_request",
+                   rb_nghttp3_connection_submit_request, -1);
+  rb_define_method(rb_cNghttp3Connection, "submit_response",
+                   rb_nghttp3_connection_submit_response, -1);
+  rb_define_method(rb_cNghttp3Connection, "submit_info",
+                   rb_nghttp3_connection_submit_info, 2);
+  rb_define_method(rb_cNghttp3Connection, "submit_trailers",
+                   rb_nghttp3_connection_submit_trailers, 2);
+  rb_define_method(rb_cNghttp3Connection, "submit_shutdown_notice",
+                   rb_nghttp3_connection_submit_shutdown_notice, 0);
+  rb_define_method(rb_cNghttp3Connection, "shutdown",
+                   rb_nghttp3_connection_shutdown, 0);
+  rb_define_method(rb_cNghttp3Connection, "set_stream_user_data",
+                   rb_nghttp3_connection_set_stream_user_data, 2);
+  rb_define_method(rb_cNghttp3Connection, "get_stream_user_data",
+                   rb_nghttp3_connection_get_stream_user_data, 1);
 }

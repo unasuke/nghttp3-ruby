@@ -30,6 +30,11 @@ extern VALUE rb_cNghttp3NV;
 extern VALUE rb_cNghttp3Connection;
 extern VALUE rb_cNghttp3Callbacks;
 
+/* QPACK module and classes */
+extern VALUE rb_mNghttp3QPACK;
+extern VALUE rb_cNghttp3QPACKEncoder;
+extern VALUE rb_cNghttp3QPACKDecoder;
+
 /* TypedData type for Settings (used by Connection) */
 extern const rb_data_type_t settings_data_type;
 
@@ -58,5 +63,6 @@ void Init_nghttp3_settings(void);
 void Init_nghttp3_nv(void);
 void Init_nghttp3_connection(void);
 void Init_nghttp3_callbacks(void);
+void Init_nghttp3_qpack(void);
 
 #endif /* NGHTTP3_RUBY_H */
