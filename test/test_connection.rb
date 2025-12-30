@@ -278,7 +278,7 @@ class TestNghttp3Connection < Minitest::Test
       Nghttp3::NV.new(":method", "GET"),
       Nghttp3::NV.new(":path", "/"),
       Nghttp3::NV.new(":scheme", "https"),
-      Nghttp3::NV.new(":authority", "example.com"),
+      Nghttp3::NV.new(":authority", "example.com")
     ]
 
     result = conn.submit_request(0, headers)
@@ -296,7 +296,7 @@ class TestNghttp3Connection < Minitest::Test
       Nghttp3::NV.new(":method", "POST"),
       Nghttp3::NV.new(":path", "/"),
       Nghttp3::NV.new(":scheme", "https"),
-      Nghttp3::NV.new(":authority", "example.com"),
+      Nghttp3::NV.new(":authority", "example.com")
     ]
 
     result = conn.submit_request(0, headers, body: "test body")
@@ -408,7 +408,7 @@ class TestNghttp3Connection < Minitest::Test
 
   def test_set_and_get_stream_user_data
     conn = Nghttp3::Connection.client_new
-    data = { id: 123, name: "test" }
+    data = {id: 123, name: "test"}
 
     result = conn.set_stream_user_data(0, data)
     assert_same conn, result

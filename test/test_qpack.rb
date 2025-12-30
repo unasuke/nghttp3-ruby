@@ -49,14 +49,12 @@ class TestNghttp3QPACK < Minitest::Test
   end
 
   def test_encoder_set_max_blocked_streams
-    encoder = Nghttp3::QPACK::Encoder.new(4096)
-    encoder.max_blocked_streams = 100
+    Nghttp3::QPACK::Encoder.new(4096).max_blocked_streams = 100
     # Should not raise
   end
 
   def test_encoder_set_max_dtable_capacity
-    encoder = Nghttp3::QPACK::Encoder.new(4096)
-    encoder.max_dtable_capacity = 2048
+    Nghttp3::QPACK::Encoder.new(4096).max_dtable_capacity = 2048
     # Should not raise
   end
 
@@ -84,8 +82,7 @@ class TestNghttp3QPACK < Minitest::Test
   end
 
   def test_decoder_set_max_dtable_capacity
-    decoder = Nghttp3::QPACK::Decoder.new(4096, 100)
-    decoder.max_dtable_capacity = 2048
+    Nghttp3::QPACK::Decoder.new(4096, 100).max_dtable_capacity = 2048
     # Should not raise
   end
 

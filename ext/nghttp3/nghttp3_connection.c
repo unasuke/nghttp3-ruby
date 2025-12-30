@@ -333,12 +333,9 @@ static VALUE rb_nghttp3_connection_read_stream(int argc, VALUE *argv,
   rb_scan_args(argc, argv, "2:", &rb_stream_id, &rb_data, &rb_opts);
 
   if (!NIL_P(rb_opts)) {
-    VALUE keys[1];
-    VALUE values[1];
-    keys[0] = ID2SYM(rb_intern("fin"));
-    rb_get_kwargs(rb_opts, keys, 0, 1, values);
-    if (values[0] != Qundef) {
-      rb_fin = values[0];
+    VALUE rb_fin_val = rb_hash_aref(rb_opts, ID2SYM(rb_intern("fin")));
+    if (!NIL_P(rb_fin_val)) {
+      rb_fin = rb_fin_val;
     }
   }
 
