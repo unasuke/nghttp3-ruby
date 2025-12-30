@@ -72,21 +72,6 @@ static VALUE connection_alloc(VALUE klass) {
 }
 
 /*
- * Returns a pointer to the underlying nghttp3_conn structure.
- * For internal use by other functions.
- */
-nghttp3_conn *nghttp3_rb_get_conn(VALUE rb_conn) {
-  ConnectionObj *obj;
-  TypedData_Get_Struct(rb_conn, ConnectionObj, &connection_data_type, obj);
-
-  if (obj->conn == NULL || obj->is_closed) {
-    rb_raise(rb_eNghttp3InvalidStateError, "Connection is closed");
-  }
-
-  return obj->conn;
-}
-
-/*
  * Returns the callbacks object associated with the connection.
  * For internal use by callback wrapper functions.
  */

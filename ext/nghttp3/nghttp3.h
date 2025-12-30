@@ -51,9 +51,6 @@ nghttp3_settings *nghttp3_rb_get_settings(VALUE rb_settings);
 /* NV helper */
 nghttp3_nv nghttp3_rb_nv_to_c(VALUE rb_nv);
 
-/* Connection helper */
-nghttp3_conn *nghttp3_rb_get_conn(VALUE rb_conn);
-
 /* Callbacks helper */
 VALUE nghttp3_rb_get_callbacks(VALUE rb_conn);
 void nghttp3_rb_setup_callbacks(nghttp3_callbacks *callbacks);
