@@ -13,7 +13,4 @@ require_relative "nghttp3/server"
 
 module Nghttp3
   class Error < StandardError; end
-
-  # Raised when an operation is attempted in an invalid state
-  class InvalidStateError < Error; end
 end
