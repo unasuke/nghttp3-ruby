@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    nghttp3 (0.1.0)
+    nghttp3 (0.0.1)
 
 GEM
   remote: https://rubygems.org/

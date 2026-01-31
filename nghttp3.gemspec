@@ -8,13 +8,12 @@ Gem::Specification.new do |spec|
   spec.authors = ["Yusuke Nakamura"]
   spec.email = ["yusuke1994525@gmail.com"]
 
-  spec.summary = "TODO: Write a short summary, because RubyGems requires one."
-  spec.description = "TODO: Write a longer description or delete this line."
+  spec.summary = "[WIP] Ruby bindings for nghttp3, an HTTP/3 library"
+  spec.description = "[WIP] Ruby bindings for nghttp3, a C library implementing HTTP/3 mapping over QUIC and QPACK encoder/decoder."
   spec.homepage = "https://github.com/unasuke/nghttp3"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
 
-  spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/unasuke/nghttp3"
   spec.metadata["changelog_uri"] = "https://github.com/unasuke/nghttp3/blob/main/CHANGELOG.md"
